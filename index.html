@@ -4,10 +4,49 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cookie Check Site</title>
+    <style>
+        /* Dark mode styling */
+        body {
+            background-color: #121212;
+            color: #f0f0f0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            color: #00ffd5;
+        }
+        #status {
+            margin: 20px 0;
+            text-align: center;
+            font-size: 1.2rem;
+        }
+        .login-buttons button {
+            background-color: #1f1f1f;
+            color: #00ffd5;
+            border: 2px solid #00ffd5;
+            border-radius: 8px;
+            padding: 10px 20px;
+            margin: 10px 0;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .login-buttons button:hover {
+            background-color: #00ffd5;
+            color: #121212;
+        }
+    </style>
 </head>
 <body>
     <h1>Cookie Check Site</h1>
     <p id="status">Checking authentication...</p>
+    <div class="login-buttons" id="login-buttons"></div>
 
     <script>
         // Configuration
@@ -18,39 +57,10 @@
         const urlParams = new URLSearchParams(window.location.search);
         const fwacc = urlParams.get('fwacc'); // Original website
         const accid = urlParams.get('accid'); // Account ID from OAuth
+        const providerParam = urlParams.get('provider'); // Optional provider param
 
-        // Check if we're returning from OAuth with an accid
-        if (accid && fwacc) {
-            // Set the cookie
-            document.cookie = `${COOKIE_NAME}=${accid}; path=/; max-age=31536000; SameSite=Lax; Secure`;
-            
-            document.getElementById('status').textContent = 'Login successful! Redirecting...';
-            
-            // Redirect back to the original website
-            setTimeout(() => {
-                window.location.href = fwacc;
-            }, 1000);
-        } 
-        // Check if we have a cookie already
-        else if (getCookie(COOKIE_NAME) && fwacc) {
-            // Cookie exists, redirect back to website
-            document.getElementById('status').textContent = 'Already logged in! Redirecting...';
-            window.location.href = fwacc;
-        }
-        // No cookie and coming from a website - need to login
-        else if (fwacc) {
-            document.getElementById('status').innerHTML = `
-                <p>Please select a login method:</p>
-                <button onclick="login('google')">Login with Google</button><br><br>
-                <button onclick="login('github')">Login with GitHub</button><br><br>
-                <button onclick="login('microsoft')">Login with Microsoft</button><br><br>
-                <button onclick="login('discord')">Login with Discord</button>
-            `;
-        }
-        // No fwacc parameter - direct access
-        else {
-            document.getElementById('status').textContent = 'Missing fwacc parameter. This page should be accessed from your application.';
-        }
+        const statusEl = document.getElementById('status');
+        const buttonsEl = document.getElementById('login-buttons');
 
         // Helper function to get cookie
         function getCookie(name) {
@@ -64,6 +74,35 @@
         function login(provider) {
             const loginUrl = `${CLOUDFLARE_WORKER}/login/${provider}?fwacc=${encodeURIComponent(fwacc)}`;
             window.location.href = loginUrl;
+        }
+
+        // Check if returning from OAuth
+        if (accid && fwacc) {
+            document.cookie = `${COOKIE_NAME}=${accid}; path=/; max-age=31536000; SameSite=Lax; Secure`;
+            statusEl.textContent = 'Login successful! Redirecting...';
+            setTimeout(() => { window.location.href = fwacc; }, 1000);
+        } 
+        else if (getCookie(COOKIE_NAME) && fwacc) {
+            statusEl.textContent = 'Already logged in! Redirecting...';
+            window.location.href = fwacc;
+        }
+        else if (fwacc) {
+            // If provider param exists, auto-login and hide buttons
+            if (providerParam) {
+                statusEl.textContent = `Logging in with ${providerParam}...`;
+                login(providerParam);
+            } else {
+                // Show buttons
+                buttonsEl.innerHTML = `
+                    <button onclick="login('google')">Login with Google</button><br>
+                    <button onclick="login('github')">Login with GitHub</button><br>
+                    <button onclick="login('microsoft')">Login with Microsoft</button><br>
+                    <button onclick="login('discord')">Login with Discord</button>
+                `;
+            }
+        } 
+        else {
+            statusEl.textContent = 'Missing fwacc parameter. This page should be accessed from your application.';
         }
     </script>
 </body>
