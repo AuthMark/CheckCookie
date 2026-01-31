@@ -1,0 +1,25 @@
+<script>
+const q = new URLSearchParams(location.search);
+const fwacc = q.get("fwacc");
+const provider = q.get("authprovider");
+const accid = q.get("accid");
+
+const key = btoa(fwacc).replace(/=+/g,"");
+const cname = `fwacc_${key}_${provider}`;
+
+function get(n){
+  return document.cookie.split("; ")
+    .find(c=>c.startsWith(n+"="))?.split("=")[1];
+}
+
+if(accid){
+  document.cookie =
+    `${cname}=${accid}; Path=/; Max-Age=31536000; Secure; SameSite=Lax`;
+  location.href = fwacc+"?accid="+accid;
+} else {
+  const v = get(cname);
+  location.href = v
+    ? fwacc+"?accid="+v
+    : `https://authmark.workers.dev/login/${provider}?fwacc=${encodeURIComponent(fwacc)}`;
+}
+</script>
