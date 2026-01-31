@@ -1,25 +1,70 @@
-<script>
-const q = new URLSearchParams(location.search);
-const fwacc = q.get("fwacc");
-const provider = q.get("authprovider");
-const accid = q.get("accid");
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cookie Check Site</title>
+</head>
+<body>
+    <h1>Cookie Check Site</h1>
+    <p id="status">Checking authentication...</p>
 
-const key = btoa(fwacc).replace(/=+/g,"");
-const cname = `fwacc_${key}_${provider}`;
+    <script>
+        // Configuration
+        const COOKIE_NAME = 'accid';
+        const CLOUDFLARE_WORKER = 'https://authmarkbackend.workers.dev';
 
-function get(n){
-  return document.cookie.split("; ")
-    .find(c=>c.startsWith(n+"="))?.split("=")[1];
-}
+        // Get URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const fwacc = urlParams.get('fwacc'); // Original website
+        const accid = urlParams.get('accid'); // Account ID from OAuth
 
-if(accid){
-  document.cookie =
-    `${cname}=${accid}; Path=/; Max-Age=31536000; Secure; SameSite=Lax`;
-  location.href = fwacc+"?accid="+accid;
-} else {
-  const v = get(cname);
-  location.href = v
-    ? fwacc+"?accid="+v
-    : `https://authmark.workers.dev/login/${provider}?fwacc=${encodeURIComponent(fwacc)}`;
-}
-</script>
+        // Check if we're returning from OAuth with an accid
+        if (accid && fwacc) {
+            // Set the cookie
+            document.cookie = `${COOKIE_NAME}=${accid}; path=/; max-age=31536000; SameSite=Lax; Secure`;
+            
+            document.getElementById('status').textContent = 'Login successful! Redirecting...';
+            
+            // Redirect back to the original website
+            setTimeout(() => {
+                window.location.href = fwacc;
+            }, 1000);
+        } 
+        // Check if we have a cookie already
+        else if (getCookie(COOKIE_NAME) && fwacc) {
+            // Cookie exists, redirect back to website
+            document.getElementById('status').textContent = 'Already logged in! Redirecting...';
+            window.location.href = fwacc;
+        }
+        // No cookie and coming from a website - need to login
+        else if (fwacc) {
+            document.getElementById('status').innerHTML = `
+                <p>Please select a login method:</p>
+                <button onclick="login('google')">Login with Google</button><br><br>
+                <button onclick="login('github')">Login with GitHub</button><br><br>
+                <button onclick="login('microsoft')">Login with Microsoft</button><br><br>
+                <button onclick="login('discord')">Login with Discord</button>
+            `;
+        }
+        // No fwacc parameter - direct access
+        else {
+            document.getElementById('status').textContent = 'Missing fwacc parameter. This page should be accessed from your application.';
+        }
+
+        // Helper function to get cookie
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+
+        // Login function
+        function login(provider) {
+            const loginUrl = `${CLOUDFLARE_WORKER}/login/${provider}?fwacc=${encodeURIComponent(fwacc)}`;
+            window.location.href = loginUrl;
+        }
+    </script>
+</body>
+</html>
