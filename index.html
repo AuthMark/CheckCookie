@@ -2,12 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>AuthMark – Cookie Check</title>
+<title>AuthMark – CookieCheck</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <style>
 body {
-  background-color:#121212;
+  background:#121212;
   color:#f0f0f0;
   font-family:Segoe UI, sans-serif;
   display:flex;
@@ -15,7 +14,6 @@ body {
   align-items:center;
   justify-content:center;
   min-height:100vh;
-  margin:0;
 }
 button {
   background:#1f1f1f;
@@ -26,89 +24,79 @@ button {
   margin:6px 0;
   cursor:pointer;
 }
-button:hover {
-  background:#00ffd5;
-  color:#121212;
-}
 </style>
 </head>
-
 <body>
+
 <h1>AuthMark</h1>
 <p id="status">Checking authentication…</p>
-<div id="login-buttons"></div>
+<div id="buttons"></div>
 
 <script>
-/* ================= CONFIG ================= */
 const COOKIE_PREFIX = 'accid_';
-const CLOUDFLARE_WORKER =
+const CLOUDFLARE =
   'https://authmarkbackend.stuffzez-yt-mail068324.workers.dev';
 
-/* ================= PARAMS ================= */
 const params = new URLSearchParams(window.location.search);
 
 const fwaccEncoded = params.get('fwacc');
 const fwacc = fwaccEncoded ? decodeURIComponent(fwaccEncoded) : null;
-
-const accid = params.get('accid');
 const provider = params.get('provider');
+const accid = params.get('accid');
 
-const statusEl = document.getElementById('status');
-const buttonsEl = document.getElementById('login-buttons');
+const status = document.getElementById('status');
+const buttons = document.getElementById('buttons');
 
-/* ================= HELPERS ================= */
-function setCookie(name, value, days = 365) {
+function setCookie(name, value) {
   const expires = new Date();
-  expires.setTime(expires.getTime() + days * 864e5);
+  expires.setFullYear(expires.getFullYear() + 1);
   document.cookie =
     `${name}=${value}; path=/; expires=${expires.toUTCString()}; SameSite=Lax; Secure`;
 }
 
 function login(provider) {
-  const url =
-    `${CLOUDFLARE_WORKER}/login/${provider}?fwacc=${encodeURIComponent(fwacc)}`;
-  window.location.href = url;
+  window.location.href =
+    `${CLOUDFLARE}/login/${provider}?fwacc=${encodeURIComponent(fwacc)}`;
 }
 
 /* ================= FLOW ================= */
 
-// Returned from OAuth
+// STEP 4 → 5 (Cloudflare → CheckCookie with accid)
 if (accid && provider && fwacc) {
-  // Store provider-specific cookie ONLY on this domain
+  // Store provider-specific cookie ONLY here
   setCookie(COOKIE_PREFIX + provider, accid);
 
-  // Forward generic accid to fwacc site
-  const redirectUrl = new URL(fwacc);
-  redirectUrl.searchParams.set('accid', accid);
+  // Forward accid to WEBSITE
+  const redirect = new URL(fwacc);
+  redirect.searchParams.set('accid', accid);
 
-  statusEl.textContent = `Logged in with ${provider}. Redirecting…`;
+  status.textContent = 'Login successful. Redirecting…';
   setTimeout(() => {
-    window.location.href = redirectUrl.toString();
+    window.location.href = redirect.toString();
   }, 500);
 }
 
-// Auto-login if provider specified
+// STEP 2 → 3 (Website → CheckCookie → Cloudflare)
 else if (fwacc && provider) {
-  statusEl.textContent = `Logging in with ${provider}…`;
+  status.textContent = `Logging in with ${provider}…`;
   login(provider);
 }
 
-// Show provider chooser
+// Provider chooser
 else if (fwacc) {
-  statusEl.textContent = 'Choose a login provider';
-  buttonsEl.innerHTML = `
-    <button onclick="login('google')">Login with Google</button>
-    <button onclick="login('github')">Login with GitHub</button>
-    <button onclick="login('microsoft')">Login with Microsoft</button>
-    <button onclick="login('discord')">Login with Discord</button>
+  status.textContent = 'Choose a provider';
+  buttons.innerHTML = `
+    <button onclick="login('google')">Google</button>
+    <button onclick="login('github')">GitHub</button>
+    <button onclick="login('microsoft')">Microsoft</button>
+    <button onclick="login('discord')">Discord</button>
   `;
 }
 
-// Invalid entry
 else {
-  statusEl.textContent =
-    'Missing fwacc parameter. This page must be opened from an AuthMark-enabled site.';
+  status.textContent = 'Invalid request.';
 }
 </script>
+
 </body>
 </html>
