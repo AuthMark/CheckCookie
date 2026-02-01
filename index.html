@@ -1,109 +1,114 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cookie Check Site</title>
-    <style>
-        /* Dark mode styling */
-        body {
-            background-color: #121212;
-            color: #f0f0f0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 20px;
-        }
-        h1 {
-            color: #00ffd5;
-        }
-        #status {
-            margin: 20px 0;
-            text-align: center;
-            font-size: 1.2rem;
-        }
-        .login-buttons button {
-            background-color: #1f1f1f;
-            color: #00ffd5;
-            border: 2px solid #00ffd5;
-            border-radius: 8px;
-            padding: 10px 20px;
-            margin: 10px 0;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-        .login-buttons button:hover {
-            background-color: #00ffd5;
-            color: #121212;
-        }
-    </style>
+<meta charset="UTF-8">
+<title>AuthMark – Cookie Check</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+  background-color:#121212;
+  color:#f0f0f0;
+  font-family:Segoe UI, sans-serif;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  min-height:100vh;
+  margin:0;
+}
+button {
+  background:#1f1f1f;
+  color:#00ffd5;
+  border:2px solid #00ffd5;
+  border-radius:8px;
+  padding:10px 20px;
+  margin:6px 0;
+  cursor:pointer;
+}
+button:hover {
+  background:#00ffd5;
+  color:#121212;
+}
+</style>
 </head>
+
 <body>
-    <h1>Cookie Check Site</h1>
-    <p id="status">Checking authentication...</p>
-    <div class="login-buttons" id="login-buttons"></div>
+<h1>AuthMark</h1>
+<p id="status">Checking authentication…</p>
+<div id="login-buttons"></div>
 
-    <script>
-        // Configuration
-        const COOKIE_NAME = 'accid';
-        const CLOUDFLARE_WORKER = 'https://authmarkbackend.stuffzez-yt-mail068324.workers.dev';
+<script>
+/* ================= CONFIG ================= */
+const COOKIE_PREFIX = 'accid_';
+const CLOUDFLARE_WORKER =
+  'https://authmarkbackend.stuffzez-yt-mail068324.workers.dev';
 
-        // Get URL parameters
-        const urlParams = new URLSearchParams(window.location.search);
-        const fwacc = urlParams.get('fwacc'); // Original website
-        const accid = urlParams.get('accid'); // Account ID from OAuth
-        const providerParam = urlParams.get('provider'); // Optional provider param
+/* ================= PARAMS ================= */
+const params = new URLSearchParams(window.location.search);
 
-        const statusEl = document.getElementById('status');
-        const buttonsEl = document.getElementById('login-buttons');
+const fwaccEncoded = params.get('fwacc');
+const fwacc = fwaccEncoded ? decodeURIComponent(fwaccEncoded) : null;
 
-        // Helper function to get cookie
-        function getCookie(name) {
-            const value = `; ${document.cookie}`;
-            const parts = value.split(`; ${name}=`);
-            if (parts.length === 2) return parts.pop().split(';').shift();
-            return null;
-        }
+const accid = params.get('accid');
+const provider = params.get('provider');
 
-        // Login function
-        function login(provider) {
-            const loginUrl = `${CLOUDFLARE_WORKER}/login/${provider}?fwacc=${encodeURIComponent(fwacc)}`;
-            window.location.href = loginUrl;
-        }
+const statusEl = document.getElementById('status');
+const buttonsEl = document.getElementById('login-buttons');
 
-        // Check if returning from OAuth
-        if (accid && fwacc) {
-            document.cookie = `${COOKIE_NAME}=${accid}; path=/; max-age=31536000; SameSite=Lax; Secure`;
-            statusEl.textContent = 'Login successful! Redirecting...';
-            setTimeout(() => { window.location.href = fwacc; }, 1000);
-        } 
-        else if (getCookie(COOKIE_NAME) && fwacc) {
-            statusEl.textContent = 'Already logged in! Redirecting...';
-            window.location.href = fwacc;
-        }
-        else if (fwacc) {
-            // If provider param exists, auto-login and hide buttons
-            if (providerParam) {
-                statusEl.textContent = `Logging in with ${providerParam}...`;
-                login(providerParam);
-            } else {
-                // Show buttons
-                buttonsEl.innerHTML = `
-                    <button onclick="login('google')">Login with Google</button><br>
-                    <button onclick="login('github')">Login with GitHub</button><br>
-                    <button onclick="login('microsoft')">Login with Microsoft</button><br>
-                    <button onclick="login('discord')">Login with Discord</button>
-                `;
-            }
-        } 
-        else {
-            statusEl.textContent = 'Missing fwacc parameter. This page should be accessed from your application.';
-        }
-    </script>
+/* ================= HELPERS ================= */
+function setCookie(name, value, days = 365) {
+  const expires = new Date();
+  expires.setTime(expires.getTime() + days * 864e5);
+  document.cookie =
+    `${name}=${value}; path=/; expires=${expires.toUTCString()}; SameSite=Lax; Secure`;
+}
+
+function login(provider) {
+  const url =
+    `${CLOUDFLARE_WORKER}/login/${provider}?fwacc=${encodeURIComponent(fwacc)}`;
+  window.location.href = url;
+}
+
+/* ================= FLOW ================= */
+
+// Returned from OAuth
+if (accid && provider && fwacc) {
+  // Store provider-specific cookie ONLY on this domain
+  setCookie(COOKIE_PREFIX + provider, accid);
+
+  // Forward generic accid to fwacc site
+  const redirectUrl = new URL(fwacc);
+  redirectUrl.searchParams.set('accid', accid);
+
+  statusEl.textContent = `Logged in with ${provider}. Redirecting…`;
+  setTimeout(() => {
+    window.location.href = redirectUrl.toString();
+  }, 500);
+}
+
+// Auto-login if provider specified
+else if (fwacc && provider) {
+  statusEl.textContent = `Logging in with ${provider}…`;
+  login(provider);
+}
+
+// Show provider chooser
+else if (fwacc) {
+  statusEl.textContent = 'Choose a login provider';
+  buttonsEl.innerHTML = `
+    <button onclick="login('google')">Login with Google</button>
+    <button onclick="login('github')">Login with GitHub</button>
+    <button onclick="login('microsoft')">Login with Microsoft</button>
+    <button onclick="login('discord')">Login with Discord</button>
+  `;
+}
+
+// Invalid entry
+else {
+  statusEl.textContent =
+    'Missing fwacc parameter. This page must be opened from an AuthMark-enabled site.';
+}
+</script>
 </body>
 </html>
