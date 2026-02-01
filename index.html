@@ -33,68 +33,83 @@ button {
 <div id="buttons"></div>
 
 <script>
+/* ================= CONFIG ================= */
 const COOKIE_PREFIX = 'accid_';
 const CLOUDFLARE =
   'https://authmarkbackend.stuffzez-yt-mail068324.workers.dev';
 
+/* ================= PARAMS ================= */
 const params = new URLSearchParams(window.location.search);
-
 const fwaccEncoded = params.get('fwacc');
 const fwacc = fwaccEncoded ? decodeURIComponent(fwaccEncoded) : null;
 const provider = params.get('provider');
-const accid = params.get('accid');
+const accidFromUrl = params.get('accid');
 
 const status = document.getElementById('status');
 const buttons = document.getElementById('buttons');
 
-function setCookie(name, value) {
-  const expires = new Date();
-  expires.setFullYear(expires.getFullYear() + 1);
-  document.cookie =
-    `${name}=${value}; path=/; expires=${expires.toUTCString()}; SameSite=Lax; Secure`;
+/* ================= HELPERS ================= */
+function getCookie(name) {
+  const v = `; ${document.cookie}`;
+  const p = v.split(`; ${name}=`);
+  return p.length === 2 ? p.pop().split(';')[0] : null;
 }
 
-function login(provider) {
+function setCookie(name, value) {
+  const exp = new Date();
+  exp.setFullYear(exp.getFullYear() + 1);
+  document.cookie =
+    `${name}=${value}; path=/; expires=${exp.toUTCString()}; SameSite=Lax; Secure`;
+}
+
+function redirectToWebsite(accid) {
+  const url = new URL(fwacc);
+  url.searchParams.set('accid', accid);
+  window.location.href = url.toString();
+}
+
+function loginViaCloudflare(provider) {
   window.location.href =
     `${CLOUDFLARE}/login/${provider}?fwacc=${encodeURIComponent(fwacc)}`;
 }
 
 /* ================= FLOW ================= */
 
-// STEP 4 → 5 (Cloudflare → CheckCookie with accid)
-if (accid && provider && fwacc) {
-  // Store provider-specific cookie ONLY here
-  setCookie(COOKIE_PREFIX + provider, accid);
-
-  // Forward accid to WEBSITE
-  const redirect = new URL(fwacc);
-  redirect.searchParams.set('accid', accid);
-
-  status.textContent = 'Login successful. Redirecting…';
-  setTimeout(() => {
-    window.location.href = redirect.toString();
-  }, 500);
-}
-
-// STEP 2 → 3 (Website → CheckCookie → Cloudflare)
-else if (fwacc && provider) {
-  status.textContent = `Logging in with ${provider}…`;
-  login(provider);
-}
-
-// Provider chooser
-else if (fwacc) {
-  status.textContent = 'Choose a provider';
-  buttons.innerHTML = `
-    <button onclick="login('google')">Google</button>
-    <button onclick="login('github')">GitHub</button>
-    <button onclick="login('microsoft')">Microsoft</button>
-    <button onclick="login('discord')">Discord</button>
-  `;
-}
-
-else {
+// Safety check
+if (!fwacc || !provider) {
   status.textContent = 'Invalid request.';
+}
+
+/*
+ STEP A:
+ Returned from Cloudflare with accid
+*/
+else if (accidFromUrl) {
+  setCookie(COOKIE_PREFIX + provider, accidFromUrl);
+  status.textContent = 'Login successful. Redirecting…';
+  redirectToWebsite(accidFromUrl);
+}
+
+/*
+ STEP B:
+ Already logged in with this provider → skip Cloudflare
+*/
+else {
+  const existingAccid = getCookie(COOKIE_PREFIX + provider);
+
+  if (existingAccid) {
+    status.textContent = 'Already authenticated. Redirecting…';
+    redirectToWebsite(existingAccid);
+  }
+
+  /*
+   STEP C:
+   Not logged in → go to Cloudflare
+  */
+  else {
+    status.textContent = `Logging in with ${provider}…`;
+    loginViaCloudflare(provider);
+  }
 }
 </script>
 
