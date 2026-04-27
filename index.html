@@ -33,22 +33,22 @@ button {
 <div id="buttons"></div>
 
 <script>
-/* ================= CONFIG ================= */
-const COOKIE_NAME = 'accid';                          // ← unified: no prefix
+const COOKIE_NAME = 'accid';
 const CLOUDFLARE =
   'https://authmarkbackend.stuffzez-yt-mail068324.workers.dev';
 
-/* ================= PARAMS ================= */
 const params = new URLSearchParams(window.location.search);
+
 const fwaccEncoded = params.get('fwacc');
 const fwacc = fwaccEncoded ? decodeURIComponent(fwaccEncoded) : null;
+
 const provider  = params.get('provider');
 const accidFromUrl = params.get('accid');
+const userId = params.get('userId'); // ✅ ADDED
 
 const status  = document.getElementById('status');
 const buttons = document.getElementById('buttons');
 
-/* ================= HELPERS ================= */
 function getCookie(name) {
   const v = `; ${document.cookie}`;
   const p = v.split(`; ${name}=`);
@@ -62,9 +62,15 @@ function setCookie(name, value) {
     `${name}=${value}; path=/; expires=${exp.toUTCString()}; SameSite=Lax; Secure`;
 }
 
-function redirectToWebsite(accid) {
+/* ✅ UPDATED: now forwards userId too */
+function redirectToWebsite(accid, userId) {
   const url = new URL(fwacc);
   url.searchParams.set('accid', accid);
+
+  if (userId) {
+    url.searchParams.set('userId', userId);
+  }
+
   window.location.href = url.toString();
 }
 
@@ -75,37 +81,26 @@ function loginViaCloudflare(prov) {
 
 /* ================= FLOW ================= */
 
-/*
- STEP A — returned from Cloudflare with accid.
- Only needs fwacc + accid; provider is NOT required here.
-*/
+/* STEP A — callback return */
 if (fwacc && accidFromUrl) {
   setCookie(COOKIE_NAME, accidFromUrl);
   status.textContent = 'Login successful. Redirecting…';
-  redirectToWebsite(accidFromUrl);
+  redirectToWebsite(accidFromUrl, userId);
 }
 
-/*
- STEP B — already logged in (cookie exists) → skip straight back.
- Only needs fwacc; provider is NOT required here either.
-*/
+/* STEP B — already logged in */
 else if (fwacc && getCookie(COOKIE_NAME)) {
   status.textContent = 'Already authenticated. Redirecting…';
-  redirectToWebsite(getCookie(COOKIE_NAME));
+  redirectToWebsite(getCookie(COOKIE_NAME), userId);
 }
 
-/*
- STEP C — not logged in, provider given → go to Cloudflare.
- Needs both fwacc AND provider.
-*/
+/* STEP C — login required */
 else if (fwacc && provider) {
   status.textContent = `Logging in with ${provider}…`;
   loginViaCloudflare(provider);
 }
 
-/*
- Fallback — missing required params for whichever step we're on.
-*/
+/* fallback */
 else {
   status.textContent = 'Invalid request.';
 }
